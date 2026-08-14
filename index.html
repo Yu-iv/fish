@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Exact Replica - Processing Generative Art</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #090909;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+  </style>
+  <!-- 引入 p5.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+
+<script>
+let t = 0;
+// 該公式中所有正弦/餘弦頻率的最小公倍數週期為 12 * PI，保證完美無縫 Loop
+const LOOP_DURATION = Math.PI * 12;
+
+function setup() {
+  createCanvas(500, 500);
+}
+
+function draw() {
+  // 原版設定：暗黑背景 (9) 與半透明白線 (alpha = 96)
+  background(9);
+  stroke(255, 96);
+  strokeWeight(1);
+
+  // 時間步進，與原版 t += PI / 80 完全一致
+  t += PI / 80;
+  let currentT = t % LOOP_DURATION; // 無縫循環時間變數
+
+  push();
+  // 將原本 400x400 的畫布置中呈現
+  translate(width / 2 - 200, height / 2 - 200);
+
+  // 10,000 個點的運算迴圈
+  for (let i = 10000; i > 0; i--) {
+    let y = i / 353;
+
+    // --- 完全還原原圖公式的幾何變換 ---
+    let baseK = (y < 9 ? 9 : 5) + Math.cos(y * 31 - currentT);
+    let k = baseK * Math.cos(i / 44);
+    let e = y / 9 - 14;
+    
+    // mag(k, e) 即 Math.hypot(k, e)
+    let d = Math.hypot(k, e) / 1.6; 
+    let c = d - currentT / 2;
+
+    // 計算 2D 畫布座標 (X, Y)
+    let px = (d * 9 + k * k) * Math.cos(c) + 200;
+    let py = (55 + d * 9) * Math.sin(c / 3) + 
+             4 * Math.sin(k * 2) + 
+             (y / 29) * k * (e + 3 * Math.sin(e * 4 - d * 4 + currentT * 3)) + 200;
+
+    // 繪製點陣
+    point(px, py);
+  }
+  pop();
+}
+</script>
+
+</body>
+</html>
