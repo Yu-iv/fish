@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Exact Replica - 3D Math Fish</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+
+<script>
+let numParticles = 10000; // 一萬個點，與原版完全一致
+const LOOP_CYCLES = 2;
+const LOOP_DURATION = Math.PI * 2 * LOOP_CYCLES;
+
+function setup() {
+  createCanvas(600, 600);
+  strokeWeight(1.2);
+}
+
+function draw() {
+  // 純黑背景配合極輕微殘影
+  background(0, 0, 0, 220);
+
+  // 時間參數 t，保證無縫無限循環
+  let t = (frameCount * 0.02) % LOOP_DURATION;
+
+  translate(width / 2, height / 2);
+
+  for (let i = 0; i < numParticles; i++) {
+    // u 表示從魚頭到魚尾的長度比例 (0.0 ~ 1.0)
+    let u = i / numParticles; 
+
+    // --- 1. 魚體長度與輪廓曲線（重現影片中的外形） ---
+    let fishLength = 280;
+    let x3d = (u - 0.45) * fishLength; // 主軸方向
+
+    // 魚身寬度（頭部過渡 -> 身體最寬 -> 尾柄極細 -> 鰭片展開）
+    let radius = 0;
+    if (u < 0.2) {
+      radius = Math.sin((u / 0.2) * (Math.PI / 2)) * 35;
+    } else if (u < 0.7) {
+      radius = Math.cos(((u - 0.2) / 0.5) * (Math.PI / 2)) * 35;
+    } else {
+      let tailU = (u - 0.7) / 0.3;
+      radius = 3 + Math.pow(tailU, 1.5) * 40; // 大幅展開的魚尾
+    }
+
+    // --- 2. 波動傳送（Traveling Wave）---
+    // 從頭到尾傳播的正弦波，擺幅隨著向尾部延伸而放大
+    let wavePhase = t * 2.5 - u * Math.PI * 4;
+    let waveSwing = Math.sin(wavePhase) * (5 + Math.pow(u, 2) * 50);
+
+    // --- 3. 環狀採樣與鰭片結構（點陣線條感的來源） ---
+    let v = u * Math.PI * 60; // 截面旋轉角
+    
+    // 魚身截面：Y軸比Z軸扁平，並加入鰭片波動
+    let y3d = Math.cos(v) * radius * 0.8;
+    let z3d = Math.sin(v) * radius * 0.45 + waveSwing;
+
+    // --- 4. 影片的核心靈魂：三維空間大角度翻轉與姿態角 ---
+    // 透過多重三角函數，讓魚在游泳時產生大範圍的滾轉 (Roll) 與俯仰 (Pitch)
+    let rollAngle = Math.sin(t * 0.5) * 1.2 + (u - 0.5) * 0.5; 
+    let pitchAngle = Math.cos(t * 0.5) * 0.6;
+    let yawAngle = -0.6; // 固定斜向角度，保持影片中左下到右上姿態
+
+    // 三維座標旋轉 (3D Rotation Matrix)
+    // 1) 滾轉 (Roll - X軸)
+    let y1 = y3d * Math.cos(rollAngle) - z3d * Math.sin(rollAngle);
+    let z1 = y3d * Math.sin(rollAngle) + z3d * Math.cos(rollAngle);
+
+    // 2) 俯仰 (Pitch - Z軸)
+    let x2 = x3d * Math.cos(pitchAngle) - y1 * Math.sin(pitchAngle);
+    let y2 = x3d * Math.sin(pitchAngle) + y1 * Math.cos(pitchAngle);
+
+    // 3) 航向角 (Yaw - Y軸)
+    let xFinal = x2 * Math.cos(yawAngle) + z1 * Math.sin(yawAngle);
+    let zFinal = -x2 * Math.sin(yawAngle) + z1 * Math.cos(yawAngle);
+
+    // --- 5. 3D 透視投影 (Perspective Projection) ---
+    let fov = 400;
+    let cameraDistance = 450;
+    let scale = fov / (cameraDistance + zFinal);
+
+    let x2d = xFinal * scale;
+    let y2d = y2 * scale;
+
+    // --- 6. 深度光彩與白點質感 ---
+    // 純白～亮灰的漸變，近處極亮，遠處半透明
+    let alpha = map(zFinal, -150, 150, 30, 255);
+    let brightness = map(zFinal, -150, 150, 80, 255);
+
+    stroke(brightness, brightness, brightness, alpha);
+    point(x2d, y2d);
+  }
+}
+</script>
+
+</body>
+</html>
