@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Ultra-Smooth Deep-Sea Fluid Entity</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #020202;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      box-shadow: 0 0 50px rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+
+<script>
+const NUM_STRANDS = 120;        // 120 條高密度結構絲線
+const POINTS_PER_STRAND = 120;  // 每條絲線 120 個點，共 14,400 個點
+const LOOP_DURATION = Math.PI * 4; // 無縫無限循環週期
+
+// 預算快取陣列
+let strandCos = new Float32Array(NUM_STRANDS);
+let strandSin = new Float32Array(NUM_STRANDS);
+
+function setup() {
+  createCanvas(650, 650);
+
+  // 預先計算絲線角度，減少運算開銷，提升動態流暢度
+  for (let s = 0; s < NUM_STRANDS; s++) {
+    let angle = (s / NUM_STRANDS) * TWO_PI;
+    strandCos[s] = Math.cos(angle);
+    strandSin[s] = Math.sin(angle);
+  }
+}
+
+function draw() {
+  // 柔和暗黑背景與極低殘影，創造高幀率絲滑尾跡
+  background(2, 2, 2, 190);
+
+  // 微幅平滑時間進程
+  let t = (frameCount * 0.008) % LOOP_DURATION;
+  translate(width / 2, height / 2);
+
+  // 全局水下浮沉與姿態緩擺
+  let floatY = Math.sin(t) * 20;
+  let floatRoll = Math.sin(t * 0.5) * 0.45 + Math.cos(t * 0.25) * 0.15;
+  let floatPitch = Math.cos(t * 0.5) * 0.3;
+  let globalYaw = -0.65;
+
+  // 預先計算三維姿態旋轉矩陣參數
+  let cosRoll = Math.cos(floatRoll), sinRoll = Math.sin(floatRoll);
+  let cosPitch = Math.cos(floatPitch), sinPitch = Math.sin(floatPitch);
+  let cosYaw = Math.cos(globalYaw), sinYaw = Math.sin(globalYaw);
+
+  for (let s = 0; s < NUM_STRANDS; s++) {
+    let cosA = strandCos[s];
+    let sinA = strandSin[s];
+    let strandAngle = (s / NUM_STRANDS) * TWO_PI;
+
+    for (let p = 0; p < POINTS_PER_STRAND; p++) {
+      let u = p / POINTS_PER_STRAND; // 0.0 (傘頂) -> 1.0 (尾端)
+
+      // --- 1. 流線形體外罩（三層漸進包絡線）---
+      let bodyLength = 350;
+      let xBase = (u - 0.38) * bodyLength;
+
+      let radius = 0;
+      let rippleScale = 0;
+
+      if (u < 0.4) {
+        // 圓潤頭罩
+        radius = Math.sin((u / 0.4) * (Math.PI / 2)) * 80;
+        rippleScale = Math.pow(u / 0.4, 2) * 8;
+      } else if (u < 0.7) {
+        // 翼狀外裙
+        let k = (u - 0.4) / 0.3;
+        radius = (80 - k * 35) * (1 + Math.sin(strandAngle * 5 + t) * 0.12);
+        rippleScale = 8 + k * 22;
+      } else {
+        // 流動細絲觸鬚
+        let k = (u - 0.7) / 0.3;
+        radius = (45 * (1 - k)) + Math.pow(k, 2.5) * 70;
+        rippleScale = 30 + k * 25;
+      }
+
+      // --- 2. 順滑的雙相干涉流體波（Fluid Dynamics Modulation）---
+      // 正弦波速度隨長度 u 自然減速傳遞，產生如水墨飄散的絲滑感
+      let wavePhase = t * 2.2 - u * Math.PI * 3.2;
+      let primaryWave = Math.sin(wavePhase);
+      
+      // 邊緣軟化褶皺波
+      let finRipple = Math.cos(strandAngle * 6 + wavePhase * 1.2) * rippleScale;
+
+      let rx = (radius + finRipple * 0.5) * cosA;
+      let ry = (radius + finRipple * 0.5) * sinA * 0.48; // 扁平截面
+
+      // 3D 空間原始點座標
+      let x3d = xBase + Math.sin(strandAngle + t) * 6;
+      let y3d = ry + primaryWave * 14 + floatY;
+      let z3d = rx;
+
+      // --- 3. 快速 3D 姿態變換矩陣 (Optimized Euler Rotation) ---
+      // Roll
+      let y1 = y3d * cosRoll - z3d * sinRoll;
+      let z1 = y3d * sinRoll + z3d * cosRoll;
+
+      // Pitch
+      let x2 = x3d * cosPitch - y1 * sinPitch;
+      let y2 = x3d * sinPitch + y1 * cosPitch;
+
+      // Yaw
+      let xFinal = x2 * cosYaw + z1 * sinYaw;
+      let zFinal = -x2 * sinYaw + z1 * cosYaw;
+
+      // --- 4. 透視投影與純粹灰階色彩系統 ---
+      let scale = 420 / (460 + zFinal);
+      let x2d = xFinal * scale;
+      let y2d = y2 * scale;
+
+      // 純灰階光效：靠近鏡頭亮白，遠處隱沒於深海
+      let depthBrightness = map(zFinal, -160, 160, 35, 255);
+      let depthAlpha = map(zFinal, -160, 160, 15, 220);
+
+      // 主骨幹與軟質羽翼的視覺區隔
+      if (s % 8 === 0 && u < 0.75) {
+        strokeWeight(1.4);
+        stroke(depthBrightness, depthAlpha);
+      } else {
+        strokeWeight(0.8);
+        stroke(depthBrightness * 0.82, depthAlpha * 0.55);
+      }
+
+      point(x2d, y2d);
+    }
+  }
+}
+</script>
+
+</body>
+</html>
