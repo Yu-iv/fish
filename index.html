@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Bioluminescent Deep-Sea Creature - Math Art</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #020204;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+      border-radius: 8px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+
+<script>
+let numParticles = 12000; // 高密度 12,000 個點，產生極致線條細節
+const NUM_STRANDS = 80;   // 80 條獨立平行纖維，構成如羽翼/羽毛般的絲線質感
+const LOOP_DURATION = Math.PI * 4; 
+
+function setup() {
+  createCanvas(650, 650);
+}
+
+function draw() {
+  // 水下極暗背景，搭配細微餘暉
+  background(2, 3, 6, 210);
+
+  let t = (frameCount * 0.012) % LOOP_DURATION;
+  translate(width / 2, height / 2);
+
+  for (let i = 0; i < numParticles; i++) {
+    // u: 沿縱軸的距離 (0.0 魚頭 -> 1.0 尾端長絲)
+    let u = i / numParticles; 
+    
+    // strandId: 決定該點屬於哪一條「光纖骨幹」
+    let strandId = i % NUM_STRANDS;
+    let strandAngle = (strandId / NUM_STRANDS) * TWO_PI;
+
+    // --- 1. 幾何外型：雙翼與多股長尾絲 ---
+    let bodyLength = 320;
+    let xBase = (u - 0.4) * bodyLength;
+
+    // 翼展寬度函數：胸腹部展開為廣闊的巨翼，尾部分裂為長絲
+    let wingSpan = Math.pow(Math.sin(u * Math.PI), 0.7) * 90;
+    let tailSpread = u > 0.6 ? Math.pow((u - 0.6) / 0.4, 2) * 60 : 0;
+    
+    let radiusX = wingSpan * Math.cos(strandAngle) * 1.2;
+    let radiusY = (wingSpan * 0.35 + tailSpread) * Math.sin(strandAngle);
+
+    // --- 2. 高階波動干涉（創造如水墨/羽翼的複雜動態）---
+    // 游動的主傳播波（由頭至尾）
+    let mainWave = Math.sin(t * 2 - u * Math.PI * 4);
+    
+    // 鰭片邊緣的高頻率微幅顫動波（FM 調變）
+    let edgeFlutter = Math.cos(t * 4 - u * Math.PI * 8 + strandAngle * 3) * (wingSpan * 0.25);
+    
+    // 脊椎 3D 大範圍 S 型擺動
+    let spineSwing = Math.sin(t - u * Math.PI * 2) * 40;
+
+    let x3d = xBase + Math.sin(strandAngle + t) * 10;
+    let y3d = radiusY + mainWave * 15 + edgeFlutter;
+    let z3d = radiusX + spineSwing;
+
+    // --- 3. 全局 3D 姿態變換（俯衝、翻滾與斜角姿態） ---
+    let roll = Math.sin(t * 0.5) * 0.8 + Math.cos(u * 3 + t) * 0.3; // 身體沿長軸扭轉
+    let pitch = Math.cos(t * 0.5) * 0.4;                          // 俯仰角
+    let yaw = -0.55;                                               // 固定黃金斜角
+
+    // 3D 矩陣旋轉
+    // Roll (X軸)
+    let y1 = y3d * Math.cos(roll) - z3d * Math.sin(roll);
+    let z1 = y3d * Math.sin(roll) + z3d * Math.cos(roll);
+
+    // Pitch (Z軸)
+    let x2 = x3d * Math.cos(pitch) - y1 * Math.sin(pitch);
+    let y2 = x3d * Math.sin(pitch) + y1 * Math.cos(pitch);
+
+    // Yaw (Y軸)
+    let xFinal = x2 * Math.cos(yaw) + z1 * Math.sin(yaw);
+    let zFinal = -x2 * Math.sin(yaw) + z1 * Math.cos(yaw);
+
+    // --- 4. 3D 透視投影 ---
+    let fov = 420;
+    let camDist = 480;
+    let scale = fov / (camDist + zFinal);
+
+    let x2d = xFinal * scale;
+    let y2d = y2 * scale;
+
+    // --- 5. 光影與點陣質感控制 ---
+    let alpha = map(zFinal, -180, 180, 20, 255);
+    let brightness = map(zFinal, -180, 180, 60, 255);
+
+    // 核心脊椎更亮、筆觸更粗，邊緣翼膜極為細緻
+    if (Math.abs(strandAngle - Math.PI) < 0.3 || Math.abs(strandAngle) < 0.3) {
+      strokeWeight(1.6);
+      stroke(brightness, brightness + 20, 255, alpha);
+    } else {
+      strokeWeight(0.9);
+      stroke(brightness * 0.85, brightness * 0.9, brightness + 10, alpha * 0.7);
+    }
+
+    point(x2d, y2d);
+  }
+}
+</script>
+
+</body>
+</html>
