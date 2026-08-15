@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Smooth Grayscale Deep-Sea Entity</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #030303;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      box-shadow: 0 0 60px rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+
+<script>
+let numParticles = 12000; // 最佳化粒子數量，兼顧極致細節與 60 FPS 順暢度
+const NUM_STRANDS = 120;
+const LOOP_DURATION = Math.PI * 4;
+
+function setup() {
+  createCanvas(650, 650);
+  pixelDensity(1); // 固定像素密度，防止高分屏（Retina）渲染效能下滑導致卡頓
+  strokeWeight(1.1); // 全局統一筆刷大小，大幅降低 CPU/GPU 狀態切換負擔
+}
+
+function draw() {
+  background(3, 3, 3, 220); // 輕微動態殘影
+
+  // 時間步進調速（由 0.01 提升至 0.022），擺脫過度遲緩感
+  let t = (frameCount * 0.022) % LOOP_DURATION;
+  translate(width / 2, height / 2);
+
+  // --- 動態彈性脈衝：模擬生物心跳與噴水推進的張力節奏 ---
+  let propulsionPulse = Math.pow(Math.sin(t * 2) * 0.5 + 0.5, 2.5);
+
+  // 三維浮游軌跡
+  let floatY = Math.sin(t * 1.2) * 30;
+  let floatRoll = Math.sin(t * 0.6) * 0.45;
+  let floatPitch = Math.cos(t * 0.6) * 0.3;
+  let globalYaw = -0.65;
+
+  for (let i = 0; i < numParticles; i++) {
+    let u = i / numParticles; 
+    let strandId = i % NUM_STRANDS;
+    let strandAngle = (strandId / NUM_STRANDS) * TWO_PI;
+
+    // --- 1. 生物形態構建 ---
+    let bodyLength = 350;
+    let xBase = (u - 0.38) * bodyLength;
+
+    let mantleRadius = 0;
+    let rippleAmplitude = 0;
+
+    if (u < 0.45) {
+      // 傘體：結合動態張縮脈衝
+      let headProgress = u / 0.45;
+      mantleRadius = Math.sin(headProgress * Math.PI) * (70 + propulsionPulse * 22);
+      rippleAmplitude = Math.pow(headProgress, 2) * 14;
+    } else if (u < 0.7) {
+      // 裙擺：呈現層次疊加
+      let skirtProgress = (u - 0.45) / 0.25;
+      mantleRadius = (75 - skirtProgress * 28) * (1 + Math.sin(strandAngle * 6) * 0.15);
+      rippleAmplitude = 22 + skirtProgress * 28;
+    } else {
+      // 觸鬚：長絲延展
+      let tailProgress = (u - 0.7) / 0.3;
+      mantleRadius = (47 * (1 - tailProgress)) + Math.pow(tailProgress, 2) * 70;
+      rippleAmplitude = 35 + tailProgress * 35;
+    }
+
+    // --- 2. 水下雙相流體波浪（節奏加快且反應靈敏）---
+    let primaryWave = Math.sin(t * 3.2 - u * Math.PI * 4 + strandAngle * 0.5);
+    let finRipples = Math.cos(strandAngle * 8 + t * 4.5 - u * Math.PI * 6) * rippleAmplitude;
+
+    let radiusX = (mantleRadius + finRipples * 0.55) * Math.cos(strandAngle);
+    let radiusY = (mantleRadius + finRipples * 0.55) * Math.sin(strandAngle) * 0.5;
+
+    let x3d = xBase + Math.sin(strandAngle + t * 2) * 8;
+    let y3d = radiusY + primaryWave * 14 + floatY;
+    let z3d = radiusX;
+
+    // --- 3. 三維姿態旋轉矩陣 ---
+    // Roll
+    let y1 = y3d * Math.cos(floatRoll) - z3d * Math.sin(floatRoll);
+    let z1 = y3d * Math.sin(floatRoll) + z3d * Math.cos(floatRoll);
+
+    // Pitch
+    let x2 = x3d * Math.cos(floatPitch) - y1 * Math.sin(floatPitch);
+    let y2 = x3d * Math.sin(floatPitch) + y1 * Math.cos(floatPitch);
+
+    // Yaw
+    let xFinal = x2 * Math.cos(globalYaw) + z1 * Math.sin(globalYaw);
+    let zFinal = -x2 * Math.sin(globalYaw) + z1 * Math.cos(globalYaw);
+
+    // --- 4. 透視投影 ---
+    let scale = 400 / (460 + zFinal);
+    let x2d = xFinal * scale;
+    let y2d = y2 * scale;
+
+    // --- 5. 灰階光學深淺（無狀態切換，極速繪製）---
+    let depthBrightness = map(zFinal, -160, 160, 35, 255);
+    let depthAlpha = map(zFinal, -160, 160, 20, 230);
+
+    stroke(depthBrightness, depthAlpha);
+    point(x2d, y2d);
+  }
+}
+</script>
+
+</body>
+</html>
